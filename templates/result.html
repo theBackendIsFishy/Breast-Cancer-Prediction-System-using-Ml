@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Prediction Result — Breast Cancer AI</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    :root {
+      --pink-soft:   #f9a8c9;
+      --pink-mid:    #e879a0;
+      --blue-deep:   #0f4c81;
+      --blue-mid:    #1a6eb5;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(-45deg, #0f4c81, #1a6eb5, #be185d, #f472b6, #1d4ed8);
+      background-size: 400% 400%;
+      animation: gradientShift 14s ease infinite;
+      overflow-x: hidden;
+      padding: 2rem 1rem;
+    }
+
+    @keyframes gradientShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(72px);
+      opacity: 0.22;
+      pointer-events: none;
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+    .orb-1 { width:380px; height:380px; background:#f9a8c9; top:-100px; right:-100px; }
+    .orb-2 { width:300px; height:300px; background:#60a5fa; bottom:-80px; left:-80px; animation-duration:22s; }
+    @keyframes drift {
+      from { transform: translate(0,0); }
+      to   { transform: translate(30px,25px); }
+    }
+
+    /* ── RESULT CARD ── */
+    .result-wrapper {
+      width: 100%;
+      max-width: 560px;
+      z-index: 1;
+    }
+
+    /* Logo / Back crumb */
+    .back-crumb {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      color: rgba(255,255,255,0.65);
+      font-size: .82rem;
+      margin-bottom: 1.4rem;
+      text-decoration: none;
+      transition: color .2s;
+    }
+    .back-crumb:hover { color: #fff; }
+    .back-crumb i { font-size: 1rem; }
+
+    .glass-card {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.28);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border-radius: 28px;
+      box-shadow: 0 24px 64px rgba(15,76,129,0.2), inset 0 1px 0 rgba(255,255,255,0.3);
+      overflow: hidden;
+      animation: popIn 0.55s cubic-bezier(.34,1.56,.64,1) both;
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.88) translateY(30px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .card-top {
+      text-align: center;
+      padding: 2rem 2rem 1.4rem;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+    }
+    .card-top h1 {
+      font-family: 'DM Serif Display', serif;
+      color: #fff;
+      font-size: 1.9rem;
+      margin-bottom: .3rem;
+    }
+    .card-top p {
+      color: rgba(255,255,255,0.6);
+      font-size: .88rem;
+    }
+
+    .card-body-custom { padding: 2rem 2.2rem 2.2rem; }
+
+    /* ── RESULT BADGE ── */
+    .result-box {
+      border-radius: 20px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 1.6rem;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+
+    /* Malignant style — triggered by JS class */
+    .result-box.malignant {
+      background: linear-gradient(135deg, rgba(239,68,68,0.25), rgba(190,24,93,0.3));
+      border: 1.5px solid rgba(239,68,68,0.45);
+    }
+    .result-box.malignant .result-icon { color: #fca5a5; }
+    .result-box.malignant .result-label { color: #fca5a5; }
+
+    /* Benign style */
+    .result-box.benign {
+      background: linear-gradient(135deg, rgba(74,222,128,0.2), rgba(16,185,129,0.25));
+      border: 1.5px solid rgba(74,222,128,0.4);
+    }
+    .result-box.benign .result-icon { color: #6ee7b7; }
+    .result-box.benign .result-label { color: #6ee7b7; }
+
+    /* Default (unknown/neutral) */
+    .result-box.neutral {
+      background: linear-gradient(135deg, rgba(96,165,250,0.2), rgba(139,92,246,0.2));
+      border: 1.5px solid rgba(96,165,250,0.35);
+    }
+    .result-box.neutral .result-icon { color: #93c5fd; }
+    .result-box.neutral .result-label { color: #93c5fd; }
+
+    .result-icon {
+      font-size: 3.2rem;
+      display: block;
+      margin-bottom: .6rem;
+      animation: iconBounce 0.7s 0.5s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    @keyframes iconBounce {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
+    .result-label {
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: .5rem;
+      opacity: .8;
+    }
+
+    .result-value {
+      font-family: 'DM Serif Display', serif;
+      font-size: 2.2rem;
+      color: #fff;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+
+    /* ── CONFIDENCE METER ── */
+    .conf-block {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px;
+      padding: 1.2rem 1.4rem;
+      margin-bottom: 1.6rem;
+      animation: fadeUp 0.6s 0.4s ease both;
+    }
+    .conf-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: rgba(255,255,255,0.75);
+      font-size: .82rem;
+      margin-bottom: .7rem;
+    }
+    .conf-pct {
+      font-weight: 700;
+      color: #fff;
+      font-size: .95rem;
+    }
+    .conf-track {
+      height: 10px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50px;
+      overflow: hidden;
+    }
+    .conf-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 50px;
+      transition: width 1.8s cubic-bezier(.4,0,.2,1);
+    }
+    .conf-fill.high   { background: linear-gradient(90deg, #4ade80, #22d3ee); }
+    .conf-fill.medium { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+    .conf-fill.low    { background: linear-gradient(90deg, #f87171, #ef4444); }
+
+    /* ── DISCLAIMER ── */
+    .disclaimer {
+      display: flex;
+      gap: .6rem;
+      background: rgba(251,191,36,0.12);
+      border: 1px solid rgba(251,191,36,0.28);
+      border-radius: 12px;
+      padding: .9rem 1.1rem;
+      color: rgba(255,255,255,0.7);
+      font-size: .78rem;
+      line-height: 1.55;
+      margin-bottom: 1.6rem;
+      animation: fadeUp 0.6s 0.5s ease both;
+    }
+    .disclaimer i { color: #fbbf24; font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── BACK BUTTON ── */
+    .btn-back {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      width: 100%;
+      padding: 1rem;
+      background: rgba(255,255,255,0.14);
+      border: 1.5px solid rgba(255,255,255,0.3);
+      border-radius: 16px;
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background .22s, transform .22s, box-shadow .22s;
+      animation: fadeUp 0.6s 0.55s ease both;
+    }
+    .btn-back:hover {
+      background: rgba(255,255,255,0.24);
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      margin-top: 1.8rem;
+      color: rgba(255,255,255,0.42);
+      font-size: .77rem;
+      text-align: center;
+    }
+    footer i { color: var(--pink-soft); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="result-wrapper">
+
+    <!-- Back crumb -->
+    <a href="/" class="back-crumb">
+      <i class="bi bi-arrow-left-circle"></i>
+      Back to Prediction Form
+    </a>
+
+    <div class="glass-card">
+      <div class="card-top">
+        <h1><i class="bi bi-activity" style="color:var(--pink-soft);"></i> &nbsp;Prediction Result</h1>
+        <p>AI analysis complete &mdash; see your diagnosis below</p>
+      </div>
+
+      <div class="card-body-custom">
+
+        <!-- ── RESULT BOX ── -->
+        <div class="result-box neutral" id="resultBox">
+          <i class="bi bi-heart-pulse-fill result-icon" id="resultIcon"></i>
+          <div class="result-label">AI Diagnosis</div>
+          <div class="result-value" id="resultValue">{{ prediction }}</div>
+        </div>
+
+        <!-- ── LR PROBABILITY BREAKDOWN ── -->
+        <div class="conf-block">
+          <div class="conf-header">
+            <span><i class="bi bi-speedometer2"></i>&nbsp; Model Confidence</span>
+            <span class="conf-pct">{{ confidence }}%</span>
+          </div>
+
+          <!-- Benign bar -->
+          <div style="margin-bottom:.75rem;">
+            <div style="display:flex; justify-content:space-between; font-size:.75rem; color:rgba(255,255,255,0.6); margin-bottom:.3rem;">
+              <span><i class="bi bi-shield-fill-check"></i>&nbsp; Benign probability</span>
+              <span>{{ benign_pct }}%</span>
+            </div>
+            <div class="conf-track">
+              <div class="conf-fill high" id="benignFill" data-value="{{ benign_pct }}" style="background: linear-gradient(90deg,#4ade80,#22d3ee);"></div>
+            </div>
+          </div>
+
+          <!-- Malignant bar -->
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:.75rem; color:rgba(255,255,255,0.6); margin-bottom:.3rem;">
+              <span><i class="bi bi-exclamation-octagon-fill"></i>&nbsp; Malignant probability</span>
+              <span>{{ malignant_pct }}%</span>
+            </div>
+            <div class="conf-track">
+              <div class="conf-fill" id="malignantFill" data-value="{{ malignant_pct }}" style="background: linear-gradient(90deg,#f87171,#ef4444);"></div>
+            </div>
+          </div>
+
+          <div style="margin-top:.55rem; font-size:.72rem; color:rgba(255,255,255,0.38); text-align:center; font-style:italic;">
+            Real probabilities · Logistic Regression
+          </div>
+        </div>
+
+        <!-- ── DISCLAIMER ── -->
+        <div class="disclaimer">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>
+            This prediction is generated by a machine learning model for
+            <strong>educational purposes only</strong> and should
+            <strong>not</strong> replace professional medical diagnosis.
+            Always consult a qualified physician.
+          </span>
+        </div>
+
+        <!-- ── BACK BUTTON ── -->
+        <a href="/" class="btn-back">
+          <i class="bi bi-arrow-repeat"></i>
+          New Prediction
+        </a>
+
+      </div>
+    </div>
+
+    <footer>
+      <i class="bi bi-heart-fill"></i>
+      AI Breast Cancer Detection Project using Machine Learning
+    </footer>
+
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const box   = document.getElementById('resultBox');
+      const icon  = document.getElementById('resultIcon');
+      const val   = document.getElementById('resultValue');
+
+      const text = val.textContent.trim().toLowerCase();
+
+      if (text.includes('malignant')) {
+        box.classList.replace('neutral', 'malignant');
+        icon.className = 'bi bi-exclamation-octagon-fill result-icon';
+      } else if (text.includes('benign')) {
+        box.classList.replace('neutral', 'benign');
+        icon.className = 'bi bi-shield-fill-check result-icon';
+      }
+
+      // Animate real probability bars
+      setTimeout(() => {
+        const benignFill    = document.getElementById('benignFill');
+        const malignantFill = document.getElementById('malignantFill');
+        if (benignFill)    benignFill.style.width    = benignFill.dataset.value    + '%';
+        if (malignantFill) malignantFill.style.width = malignantFill.dataset.value + '%';
+      }, 400);
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
